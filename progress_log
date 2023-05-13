@@ -1,0 +1,33 @@
+starting... 
+handling point 1...\
+got to know find returns exactly what we need for this project...
+identified corner when folder in destination is repeated...
+find | sed -n '/\..*[^\/]\..*$/p' explain...
+how to handle files like md. ???
+got to know a way of checking folders :
+            check_dir                                                                                                                                                   
+        1 if  [ -d tests ] ;
+        2 then 
+        3     echo exists
+        4 fi
+another thing is that ./tests/dir1/ is eq to ./tests//dir1/
+
+handled exception when destination doesn't exists
+
+the exception when two file of same name are present handled
+explain : 
+    stat ./tests/pond/dir1/image.jpg | sed -n '/Birth/p' | awk 'BEGIN{FS=" "}{print $2}' | awk 'BEGIN{FS="-"} {print $3$2$1}'
+ gives ddmmyyyy
+
+ Handled log and temp file .folders_list
+
+ handle case when called multiple times and same timestamps don't get considered
+
+ handled -d removal option
+ handled cat nofile error use redirection
+
+ what to do when more than two files are supposed to have the same name ? 
+
+
+
+
