@@ -2,19 +2,21 @@
 
 #var_management
 from_dir="./tests/pond/"
-to_dir="./tests/redirect/"
+to_dir="./tests/redirect"
 del_flag=0
 transfers_done=0
 folders_made=0
 s_chosen="ext"
+exclusions=""
 #########################|
 
 #flag manager
-while getopts 'ds:' OPTION ;
+while getopts 'ds:e:' OPTION ;
 do
     case "$OPTION" in
         d) del_flag=1 ;;
         s) s_chosen=$OPTARG;;
+        e) exclusions=$OPTARG
     esac
 done
 #########################|
@@ -27,6 +29,18 @@ echo "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^"
 #############################################################################|
 
 #############################################################################|
+
+#exclusions
+if [ ! $exclusions = ""  ]
+then
+    echo "t0rvalds : exclusions are on, excluding files with extensions "
+    echo $exclusions | awk 'BEGIN{OFS=" ";FS=","}{print $0}' > .exclusions_list
+    for exc in `cat .exclusions_list`
+    do
+        echo $exc
+    done
+fi
+
 #main_program
 if [ $s_chosen = "ext" ]
 then
@@ -34,6 +48,7 @@ then
 for i in `find $from_dir -type f | sed -n '/\..*[^\/]\..*$/p'  ` ;
 do
     #echo $i
+    exclude_flag=0
     name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
     ext=`echo $name | awk 'BEGIN{FS="."} {print $NF}'`
     if [ ! -d $to_dir ]
@@ -42,6 +57,16 @@ do
         mkdir $to_dir
     fi
 
+    for exc in `cat .exclusions_list`
+    do
+        if [ $exc = $ext ]
+        then
+            echo "t0rvalds : exclusion raised for $name as .$exc files are excluded..."
+            exclude_flag=1
+        fi
+    done
+if [ ! $exclude_flag = 1 ]
+then
     if [ -d $to_dir/ext_$ext ] ;
     then
         if [ -f $to_dir/ext_$ext/$name ]
@@ -72,6 +97,7 @@ do
         echo $i >> .files_moved
     fi
     echo $to_dir/ext_$ext >> .folder_list
+fi
 done
 fi
 #######################################################################################################################|
@@ -84,6 +110,7 @@ fi
  for i in `find $from_dir -type f` ;
  do
      #echo $i
+     exclude_flag=0
      name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
      ext=`echo $name | awk 'BEGIN{FS="."} {print $NF}'`
      if [ ! -d $to_dir ]
@@ -92,7 +119,18 @@ fi
          mkdir $to_dir
      fi
      ddmmyyyy=`stat $i | sed -n '/Birth/p' | awk 'BEGIN{FS=" "}{print $2}' | awk 'BEGIN{FS="-"} {print $3$2$1}'`
-     if [ -d $to_dir/$ddmmyyyy ] ;
+
+     for exc in `cat .exclusions_list`
+     do
+         if [ $exc = $ext ]
+         then
+             echo "t0rvalds : exclusion raised for $name as .$exc files are excluded..."
+             exclude_flag=1
+         fi
+     done
+ if [ ! $exclude_flag = 1 ]
+ then
+    if [ -d $to_dir/$ddmmyyyy ] ;
      then
          if [ -f $to_dir/$ddmmyyyy/$name ]
          then
@@ -121,6 +159,7 @@ fi
          echo $i >> .files_moved
      fi
      echo $to_dir/$ddmmyyyy >> .folder_list
+ fi
  done
  fi
  #######################################################################################################################|
@@ -166,6 +205,11 @@ fi
 if [ -f .files_moved ] ;
 then
     rm .files_moved
+fi
+
+if [ -f .exclusions_list ];
+then
+    rm .exclusions_list
 fi
 ##################################################################################|
 
