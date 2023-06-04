@@ -12,25 +12,36 @@
 #########################3
 
 #var_management
-from_dir="./tests/pond/"
-to_dir="./tests/redirect"
+from_dir="$1"
+to_dir="$2"
+shift
+shift
 del_flag=0
 transfers_done=0
 folders_made=0
 s_chosen="ext"
 exclusions=""
+log_name="log.txt"
 #########################|
 
-#flag manager
-while getopts 'ds:e:' OPTION ;
-do
-    case "$OPTION" in
-        d) del_flag=1 ;;
-        s) s_chosen=$OPTARG;;
-        e) exclusions=$OPTARG
-    esac
-done
-#########################|
+############################|
+while getopts 'ds:e:ql' OPTION ;
+ do
+     case "$OPTION" in
+         d) del_flag=1 ;;
+         s) s_chosen=$OPTARG;;
+         e) exclusions=$OPTARG;;
+         l) log_name=$OPTARG;;
+     esac
+ done
+ #########################|
+#handle no optargs passed error !
+
+
+if [ -f $log_name ]
+then
+    rm -f $log_name
+fi
 
 
 #welcome Label
@@ -39,142 +50,178 @@ echo "|                    Heyyy! Welcome TO t0rvalds                      |"
 echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^${txtwht}"
 #############################################################################|
 
+#running zip preprocessor
 #############################################################################|
 
-#exclusions
-if [ ! $exclusions = ""  ]
-then
-    echo "t0rvalds : exclusions are on, excluding files with extensions "
-    echo $exclusions | awk 'BEGIN{OFS=" ";FS=","}{print $0}' > .exclusions_list
-    for exc in `cat .exclusions_list`
-    do
-        echo $exc
-    done
-fi
-
-#main_program
-if [ $s_chosen = "ext" ]
-then
-    echo "t0rvalds : organizing by extension"
-for i in `find $from_dir -type f | sed -n '/\..*[^\/]\..*$/p'  ` ;
-do
-    #echo $i
-    exclude_flag=0
-    name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
-    ext=`echo $name | awk 'BEGIN{FS="."} {print $NF}'`
-    if [ ! -d $to_dir ]
-    then
-        echo "t0rvalds : the destination folder doesn't exists, making"
-        mkdir $to_dir
-    fi
-
-    for exc in `cat .exclusions_list`
-    do
-        if [ $exc = $ext ]
-        then
-            echo "t0rvalds : exclusion raised for $name as .$exc files are excluded..."
-            exclude_flag=1
-        fi
-    done
-if [ ! $exclude_flag = 1 ]
-then
-    if [ -d $to_dir/ext_$ext ] ;
-    then
-        if [ -f $to_dir/ext_$ext/$name ]
-        then
-            ddmmyyyy=`stat $i | sed -n '/Birth/p' | awk 'BEGIN{FS=" "}{print $2}' | awk 'BEGIN{FS="-"} {print $3$2$1}'`
-            mv $to_dir/ext_$ext/$name $to_dir/ext_$ext/dummy
-            cp $i $to_dir/ext_$ext
-            new_name=`echo $name | sed 's/\.[^.].*$//'`
-            mv $to_dir/ext_$ext/$name $to_dir/ext_$ext/$new_name"_"$ddmmyyyy"."$ext
-            mv $to_dir/ext_$ext/dummy $to_dir/ext_$ext/$name
-            if [ ! -f "$to_dir/ext_$ext/$new_name"_"$ddmmyyyy"."$ext" ]
-            then
-            echo "t0rvalds : the file $name already exists, copying as $new_name"_"$ddmmyyyy"."$ext"
-            fi
-        else
-        echo "t0rvalds : copying $name to folder ext_$ext"
-        cp $i $to_dir/ext_$ext
-        fi
-        let "transfers_made=transfers_made+1"
-        echo $i >> .files_moved
-    else
-        echo "t0rvalds : making directory ext_$ext"
-        mkdir $to_dir/ext_$ext
-        let "folders_made=folders_made+1"
-        echo "t0rvalds : copying $name to folder ext_$ext"
-        cp $i $to_dir/ext_$ext
-        let "transfers_made=transfers_made+1"
-        echo $i >> .files_moved
-    fi
-    echo $to_dir/ext_$ext >> .folder_list
-fi
-done
-fi
-#######################################################################################################################|
-
- #############################################################################|
- #main_program_date
- if [ $s_chosen = "date" ]
- then
-     echo "t0rvalds : organizing by date created"
- for i in `find $from_dir -type f` ;
+ while  [ `find $from_dir -name "*.zip" -type f | wc -l` -gt 1 ] ;
  do
-     #echo $i
-     exclude_flag=0
-     name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
-     ext=`echo $name | awk 'BEGIN{FS="."} {print $NF}'`
-     if [ ! -d $to_dir ]
-     then
-         echo "t0rvalds : the destination folder doesn't exists, creating"
-         mkdir $to_dir
-     fi
-     ddmmyyyy=`stat $i | sed -n '/Birth/p' | awk 'BEGIN{FS=" "}{print $2}' | awk 'BEGIN{FS="-"} {print $3$2$1}'`
+     for i in `find $from_dir -name "*.zip" -type f`;
+     do
+         name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
+         path=`echo $i | sed -n -e "s/$name$//p"`
+         unzip -o -q $i -d $path/$name'(unpack)' 2> /dev/null
+         mv $i $i"^"
+     done
+ done
 
+ for i in `find $from_dir -name "*.zip^" -type f` ;
+ do
+    mv $i  `echo $i | sed 's/\^//g'`
+ done
+#####################################################|
+
+#exclusions
+ if [ ! $exclusions = ""  ]
+ then
+     echo "t0rvalds : exclusions are on, excluding files with extensions "
+     echo $exclusions | sed 's/,/ /g' > .exclusions_list
      for exc in `cat .exclusions_list`
      do
-         if [ $exc = $ext ]
-         then
-             echo "t0rvalds : exclusion raised for $name as .$exc files are excluded..."
-             exclude_flag=1
-         fi
+         echo $exc
      done
- if [ ! $exclude_flag = 1 ]
- then
-    if [ -d $to_dir/$ddmmyyyy ] ;
-     then
-         if [ -f $to_dir/$ddmmyyyy/$name ]
-         then
-             mv $to_dir/$ddmmyyyy/$name $to_dir/$ddmmyyyy/dummy
-             cp $i $to_dir/$ddmmyyyy
-             new_name=`echo $name | sed 's/\.[^.].*$//'`
-             mv $to_dir/$ddmmyyyy/$name $to_dir/$ddmmyyyy/$new_name"_"$ddmmyyyy"."$ext
-             mv $to_dir/$ddmmyyyy/dummy $to_dir/$ddmmyyyy/$name
-             if [ ! -f "$to_dir/$ddmmyyyy/$new_name"_"$ddmmyyyy"."$ext" ]
-             then
-                 echo "t0rvalds : the file $name already exists, copying as $new_name"_"$ddmmyyyy"."$ext"
-             fi
-         else
-         echo "t0rvalds : copying $name to folder $ddmmyyyy"
-         cp $i $to_dir/$ddmmyyyy
-         fi
-         let "transfers_made=transfers_made+1"
-         echo $i >> .files_moved
-     else
-         echo "t0rvalds : making directory ext_$ext"
-         mkdir $to_dir/$ddmmyyyy
-         let "folders_made=folders_made+1"
-         echo "t0rvalds : copying $name to folder $ddmmyyyy"
-         cp $i $to_dir/$ddmmyyyy
-         let "transfers_made=transfers_made+1"
-         echo $i >> .files_moved
-     fi
-     echo $to_dir/$ddmmyyyy >> .folder_list
  fi
- done
- fi
- #######################################################################################################################|
+#####################################################|
 
+ #main_program
+  if [ $s_chosen = "ext" ]
+  then
+      echo "t0rvalds : organizing by extension"
+  for i in `find $from_dir -type f | sed -n '/\..*[^\/]\..*$/p'  ` ;
+  do
+      count=`echo $i | grep -c "(unpack)"`
+      exclude_flag=0
+      name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
+      ext=`echo $name | awk 'BEGIN{FS="."} {print $NF}'`
+      path=`echo $i | sed -n -e "s/$name$//p"`
+      if [ $count -ge 1 ]
+      then
+          echo "t0rvalds : looking in archive $path"
+      fi
+      if [ ! -d $to_dir ]
+      then
+          echo "t0rvalds : the destination folder doesn't exists, conflicts"
+          mkdir $to_dir
+      fi
+
+      for exc in `cat .exclusions_list 2> /dev/null`
+      do
+          if [ $exc = $ext ]
+          then
+              echo "t0rvalds : exclusion raised for $name as .$exc files are excluded..."
+              exclude_flag=1
+          fi
+      done
+  if [ ! $exclude_flag = 1 ]
+  then
+      if [ -d $to_dir/ext_$ext ] ;
+      then
+          if [ -f $to_dir/ext_$ext/$name ]
+          then
+              ddmmyyyy=`stat $i | sed -n '/Birth/p' | awk 'BEGIN{FS=" "}{print $2}' | awk 'BEGIN{FS="-"} {print $3$2$1}'`
+              mv $to_dir/ext_$ext/$name $to_dir/ext_$ext/dummy
+              cp $i $to_dir/ext_$ext
+              new_name=`echo $name | sed 's/\.[^.].*$//'`
+              mv $to_dir/ext_$ext/$name $to_dir/ext_$ext/$new_name"_"$ddmmyyyy"."$ext
+              mv $to_dir/ext_$ext/dummy $to_dir/ext_$ext/$name
+              if [ ! -f "$to_dir/ext_$ext/$new_name"_"$ddmmyyyy"."$ext" ]
+              then
+              echo "t0rvalds : the file $name already exists, copying as $new_name"_"$ddmmyyyy"."$ext"
+              echo $name $i $to_dir/ext_$ext/$new_name"_"$ddmmyyyy"."$ext >> $log_name
+              fi
+          else
+          echo "t0rvalds : copying $name to folder ext_$ext"
+          cp $i $to_dir/ext_$ext
+          fi
+          let "transfers_made=transfers_made+1"
+          echo $i >> .files_moved
+          echo $name $i $to_dir/ext_$ext/$name >> $log_name
+      else
+          echo "t0rvalds : making directory ext_$ext"
+          mkdir $to_dir/ext_$ext
+          let "folders_made=folders_made+1"
+          echo "t0rvalds : copying $name to folder ext_$ext"
+          cp $i $to_dir/ext_$ext
+          let "transfers_made=transfers_made+1"
+          echo $i >> .files_moved
+          echo $name $i $to_dir/ext_$ext/$name >> $log_name
+      fi
+      echo $to_dir/ext_$ext >> .folder_list
+  fi
+  done
+  fi
+  #######################################################################################################################|
+
+
+  #############################################################################|
+   #main_program_date
+   if [ $s_chosen = "date" ]
+   then
+       echo "t0rvalds : organizing by date created"
+   for i in `find $from_dir -type f` ;
+   do
+       #echo $i
+       count=`echo $i | grep -c "(unpack)"`
+       exclude_flag=0
+       name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
+       ext=`echo $name | awk 'BEGIN{FS="."} {print $NF}'`
+       path=`echo $i | sed -n -e "s/$name$//p"`
+       if [ $count -ge 1 ]
+       then
+           echo "t0rvalds : looking in archive $path"
+       fi
+       if [ ! -d $to_dir ]
+       then
+           echo "t0rvalds : the destination folder doesn't exists, creating"
+           mkdir $to_dir
+       fi
+       ddmmyyyy=`stat $i | sed -n '/Birth/p' | awk 'BEGIN{FS=" "}{print $2}' | awk 'BEGIN{FS="-"} {print $3$2$1}'`
+
+       for exc in `cat .exclusions_list 2> /dev/null`
+       do
+           if [ $exc = $ext ]
+           then
+               echo "t0rvalds : exclusion raised for $name as .$exc files are excluded..."
+               exclude_flag=1
+           fi
+       done
+   if [ ! $exclude_flag = 1 ]
+   then
+      if [ -d $to_dir/$ddmmyyyy ] ;
+       then
+           if [ -f $to_dir/$ddmmyyyy/$name ]
+           then
+               mv $to_dir/$ddmmyyyy/$name $to_dir/$ddmmyyyy/dummy
+               cp $i $to_dir/$ddmmyyyy
+               new_name=`echo $name | sed 's/\.[^.].*$//'`
+               mv $to_dir/$ddmmyyyy/$name $to_dir/$ddmmyyyy/$new_name"_"$ddmmyyyy"."$ext
+               mv $to_dir/$ddmmyyyy/dummy $to_dir/$ddmmyyyy/$name
+               if [ ! -f "$to_dir/$ddmmyyyy/$new_name"_"$ddmmyyyy"."$ext" ]
+               then
+                   echo "t0rvalds : the file $name already exists, copying as $new_name"_"$ddmmyyyy"."$ext"
+                   echo $name $i $to_dir/$ddmmyyyy/$new_name"_"$ddmmyyyy"."$ext >> $log_name
+               fi
+           else
+           echo "t0rvalds : copying $name to folder $ddmmyyyy"
+           cp $i $to_dir/$ddmmyyyy
+           fi
+           let "transfers_made=transfers_made+1"
+           echo $i >> .files_moved
+           echo $name $i $to_dir/$ddmmyyyy/$name >> $log_name
+       else
+           echo "t0rvalds : making directory ext_$ext"
+           mkdir $to_dir/$ddmmyyyy
+           let "folders_made=folders_made+1"
+           echo "t0rvalds : copying $name to folder $ddmmyyyy"
+           cp $i $to_dir/$ddmmyyyy
+           let "transfers_made=transfers_made+1"
+           echo $i >> .files_moved
+           echo $name $i $to_dir/$ddmmyyyy/$name >> $log_name
+       fi
+       echo $to_dir/$ddmmyyyy >> .folder_list
+   fi
+   done
+   fi
+   #############################################################################|
 
 
 #log generation
@@ -186,7 +233,7 @@ echo "Total Moves : $transfers_made"
 for i in `cat .folder_list 2>/dev/null | sort |uniq`;
 do
     folder_name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
-    echo "The folder $folder_name has `ls $i | wc -l` files."
+    echo "The folder $folder_name now has `ls $i | wc -l` files."
 done
 ##################################################################################|
 
@@ -222,11 +269,21 @@ if [ -f .exclusions_list ];
 then
     rm .exclusions_list
 fi
+
+for i in `find . -type d -name "*.zip(unpack)" 2> /dev/null `;
+do
+    rm -rf $i 2> /dev/null
+done
+
 ##################################################################################|
 
-
+echo -e $options_string
 #bye
 echo -e "${txtylw}-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^"
 echo "|                                Bye!                                |"
 echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^${txtwht}"
 ##################################################################################|
+#helper code
+tree $from_dir
+tree $to_dir
+more log.txt
