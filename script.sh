@@ -25,7 +25,7 @@ log_name="log.txt"
 #########################|
 
 ############################|
-while getopts 'ds:e:ql' OPTION ;
+while getopts 'ds:e:ql:' OPTION ;
  do
      case "$OPTION" in
          d) del_flag=1 ;;
@@ -75,7 +75,7 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
  then
      echo "t0rvalds : exclusions are on, excluding files with extensions "
      echo $exclusions | sed 's/,/ /g' > .exclusions_list
-     for exc in `cat .exclusions_list`
+     for exc in `cat .exclusions_list 2>/dev/null`
      do
          echo $exc
      done
@@ -116,19 +116,25 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
       if [ -d $to_dir/ext_$ext ] ;
       then
           if [ -f $to_dir/ext_$ext/$name ]
+
           then
-              ddmmyyyy=`stat $i | sed -n '/Birth/p' | awk 'BEGIN{FS=" "}{print $2}' | awk 'BEGIN{FS="-"} {print $3$2$1}'`
-              mv $to_dir/ext_$ext/$name $to_dir/ext_$ext/dummy
-              cp $i $to_dir/ext_$ext
-              new_name=`echo $name | sed 's/\.[^.].*$//'`
-              mv $to_dir/ext_$ext/$name $to_dir/ext_$ext/$new_name"_"$ddmmyyyy"."$ext
-              mv $to_dir/ext_$ext/dummy $to_dir/ext_$ext/$name
-              if [ ! -f "$to_dir/ext_$ext/$new_name"_"$ddmmyyyy"."$ext" ]
-              then
-              echo "t0rvalds : the file $name already exists, copying as $new_name"_"$ddmmyyyy"."$ext"
-              echo $name $i $to_dir/ext_$ext/$new_name"_"$ddmmyyyy"."$ext >> $log_name
-              fi
+              name_orig=`echo $name | sed 's/\.[^.].*$//'`
+              #name_orig=$name
+              name=$name_orig
+              j=0
+              while [ -f $to_dir/ext_$ext/$name"."$ext ]
+              do
+                  echo "t0rvalds : $name"."$ext exists in destination folder"
+                  let "j=j+1"
+                  name=$name_orig"_"$j
+              done
+              cp $i /tmp
+              mv /tmp/$name_orig"."$ext /tmp/$name"."$ext
+              mv /tmp/$name"."$ext $to_dir/ext_$ext
+              name=$name"."$ext
+              echo "t0rvalds : copying $name_orig.$ext as $name"
           else
+
           echo "t0rvalds : copying $name to folder ext_$ext"
           cp $i $to_dir/ext_$ext
           fi
@@ -164,6 +170,12 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
        exclude_flag=0
        name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
        ext=`echo $name | awk 'BEGIN{FS="."} {print $NF}'`
+
+       if [ $ext == $name ]
+       then
+       ext=""
+       fi
+
        path=`echo $i | sed -n -e "s/$name$//p"`
        if [ $count -ge 1 ]
        then
@@ -178,11 +190,11 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
 
        for exc in `cat .exclusions_list 2> /dev/null`
        do
-           if [ $exc = $ext ]
+           if [ $exc == $ext ]
            then
                echo "t0rvalds : exclusion raised for $name as .$exc files are excluded..."
                exclude_flag=1
-           fi
+           fi 2>/dev/null
        done
    if [ ! $exclude_flag = 1 ]
    then
@@ -190,23 +202,59 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
        then
            if [ -f $to_dir/$ddmmyyyy/$name ]
            then
-               mv $to_dir/$ddmmyyyy/$name $to_dir/$ddmmyyyy/dummy
-               cp $i $to_dir/$ddmmyyyy
-               new_name=`echo $name | sed 's/\.[^.].*$//'`
-               mv $to_dir/$ddmmyyyy/$name $to_dir/$ddmmyyyy/$new_name"_"$ddmmyyyy"."$ext
-               mv $to_dir/$ddmmyyyy/dummy $to_dir/$ddmmyyyy/$name
-               if [ ! -f "$to_dir/$ddmmyyyy/$new_name"_"$ddmmyyyy"."$ext" ]
-               then
-                   echo "t0rvalds : the file $name already exists, copying as $new_name"_"$ddmmyyyy"."$ext"
-                   echo $name $i $to_dir/$ddmmyyyy/$new_name"_"$ddmmyyyy"."$ext >> $log_name
-               fi
+ #              mv $to_dir/$ddmmyyyy/$name $to_dir/$ddmmyyyy/dummy
+ #              cp $i $to_dir/$ddmmyyyy
+#             new_name=`echo $name | sed 's/\.[^.].*$//'`
+#              mv $to_dir/$ddmmyyyy/$name $to_dir/$ddmmyyyy/$new_name"_"$ddmmyyyy"."$ext
+#              mv $to_dir/$ddmmyyyy/dummy $to_dir/$ddmmyyyy/$name
+#              if [ ! -f "$to_dir/$ddmmyyyy/$new_name"_"$ddmmyyyy"."$ext" ]
+#              then
+#                  echo "t0rvalds : the file $name already exists, copying as $new_name"_"$ddmmyyyy"."$ext"
+#                  echo $name $i $to_dir/$ddmmyyyy/$new_name"_"$ddmmyyyy"."$ext >> $log_name
+           if [ ! $ext == "" ]
+           then
+                name_orig=`echo $name | sed 's/\.[^.].*$//'`
+                name=$name_orig
+                j=0
+                while [ -f $to_dir/$ddmmyyyy/$name"."$ext ]
+                do
+                echo "t0rvalds : $name"."$ext exists in destination folder"
+                let "j=j+1"
+                name=$name_orig"_"$j
+                done
+                cp $i /tmp
+                mv /tmp/$name_orig"."$ext /tmp/$name"."$ext
+                mv /tmp/$name"."$ext $to_dir/$ddmmyyyy
+                echo "t0rvalds : copying $name_orig.$ext as $name"
+                let "transfers_made=transfers_made+1"
+                echo $i >> .files_moved
+                echo $name_orig"."$ext $i $to_dir/$ddmmyyyy/$name"."$ext >> $log_name
+            else
+                name_orig=$name
+                j=0
+                while [ -f $to_dir/$ddmmyyyy/$name ]
+                do
+                    echo "t0rvalds : $name exists in destination folder"
+                    let "j=j+1"
+                    name=$name_orig"_"$j
+                done
+                cp $i /tmp
+                mv /tmp/$name_orig /tmp/$name
+                mv /tmp/$name $to_dir/$ddmmyyyy
+                echo "t0rvalds : copying $name_orig as $name"
+                let "transfers_made=transfers_made+1"
+                echo $i >> .files_moved
+                echo $name_orig $i $to_dir/$ddmmyyyy/$name >> $log_name
+           fi
+
            else
+
            echo "t0rvalds : copying $name to folder $ddmmyyyy"
            cp $i $to_dir/$ddmmyyyy
-           fi
            let "transfers_made=transfers_made+1"
            echo $i >> .files_moved
            echo $name $i $to_dir/$ddmmyyyy/$name >> $log_name
+           fi
        else
            echo "t0rvalds : making directory ext_$ext"
            mkdir $to_dir/$ddmmyyyy
@@ -286,4 +334,4 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
 #helper code
 tree $from_dir
 tree $to_dir
-more log.txt
+more $log_name
