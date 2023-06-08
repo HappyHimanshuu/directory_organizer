@@ -12,8 +12,8 @@
 #########################3
 
 ###############################|
-paplay bgm.mp3 &
-music_pid=`echo "$!"`
+paplay bgm.mp3 & >/dev/null
+music_pid=`echo "$!"` >/dev/null
 ###############################|
 
 #var_management
@@ -22,39 +22,54 @@ to_dir="$2"
 shift
 shift
 del_flag=0
-transfers_done=0
 folders_made=0
 s_chosen="ext"
 exclusions=""
 log_name="log.txt"
-ignore_hidden=0
+sedex='/\/[^/.]\+\.\?[^/.]\+$/p'
+g_invoked=0
 #########################|
 
 #encorporating the options
 ############################|
-while getopts 'ds:e:l:i' OPTION ;
+while getopts ':ds:e:l:g:' OPTION ;
  do
      case "$OPTION" in
          d) del_flag=1 ;;
-         s) s_chosen=$OPTARG;;
-         e) exclusions=$OPTARG;;
-         l) log_name=$OPTARG;;
-         i);;
-         ?)echo -e "Usage : bash script.sh <source_dir> <destination_dir> -s <date/ext> -e <extensions_to_be_excluded FS=,> <-d> -l <log_name>"
-           exit 1;;
+         s) s_chosen=$OPTARG;
+            if [ ! s_chosen = "ext" ] && [ ! s_chosen = "date" ] ;
+            then
+                echo "Wrong argument passed for -s, printing usage..."
+                cat usage;
+                kill -9 $music_pid > /dev/null;
+                exit 1;
+            fi ;;
+         e) exclusions=$OPTARG ;;
+         l) log_name=$OPTARG ;;
+         g) sedex=$OPTARG ;
+             g_invoked=1
+             echo "Using customised sed for extension filter(unstable)";;
+         :) echo -e "Wrong usage, use option -h to print usage."
+             cat usage ;
+             kill -9 $music_pid > /dev/null;
+             exit 1 ;;
+         ?)echo -e "Wrong usage, use option -h to print usage."
+             cat usage ;
+             kill -9 $music_pid > /dev/null;
+             exit 1 ;;
      esac
  done
  #########################|
 #handle no optargs passed error !
 
 #remove pre-existing logfile of the same name
-if [ -f $log_name ]
+if [ -f .log ]
 then
-    rm -f $log_name
+    rm -f .log
 fi
 
 #################################################################################|
-echo -e "${txtgrn}FileName      SourceDir       DestinationDir      TimeStamp${txtwht}" >> $log_name
+echo -e "${txtgrn}FileName      SourceDir       DestinationDir      TimeStamp${txtwht}" >> .log
 
 #welcome Label
 echo -e  "${txtylw}-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^"
@@ -76,6 +91,7 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
      done
  done
 
+
  for i in `find $from_dir -name "*.zip^" -type f` ;
  do
     mv $i  `echo $i | sed 's/\^//g'`
@@ -94,13 +110,18 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
  fi
  #handle ""
 #####################################################|
-
- #main_program
+find $from_dir -type f | sed -n $sedex  > .operate
+if [ $g_invoked -eq 0 ];
+then
+    find $from_dir -type f | sed -n '/\/[^./]$/p' >> .operate
+fi
+#####################################################|
+#main_program
  #to organize by extensions
   if [ $s_chosen = "ext" ]
   then
       echo -e "t0rvalds : organizing by extension"
-  for i in `find $from_dir -type f | sed -n '/\.[^/]\+$/p'  ` ;
+  for i in `cat .operate` ;
   do
       count=`echo $i | grep -c "(unpack)"` #to check if lookig in an archive
       exclude_flag=0
@@ -127,12 +148,20 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
           fi
       done
 
+        if [ $ext == $name ] #handler for empty extensions
+        then
+        ext=""
+        fi
+
+
   if [ ! $exclude_flag = 1 ]
   then
       if [ -d $to_dir/ext_$ext ] ;
       then
           if [ -f $to_dir/ext_$ext/$name ] #check if a file with same name already exists at the destination directory
           then
+            if [ ! $ext == "" ] #handling files with extensions
+            then
               name_orig=`echo $name | sed 's/\.[^.].*$//'`
               #name_orig=$name
               name=$name_orig
@@ -148,25 +177,54 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
               mv /tmp/$name"."$ext $to_dir/ext_$ext
               name=$name"."$ext
               echo -e "t0rvalds : copying $name_orig.$ext as $name"
+              echo -e $i >> .files_moved
+              echo -e "${txtylw}$name${txtwht}       $i        $to_dir/ext_$ext/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> .log
+            else
+                 name_orig=$name
+                 j=0
+                 while [ -f $to_dir/ext_$ext/$name ]
+                 do
+                     echo -e "t0rvalds : $name exists in destination folder"
+                     let "j=j+1"
+                     name=$name_orig"_"$j
+                 done
+                 cp -p $i /tmp
+                 mv /tmp/$name_orig /tmp/$name
+                 mv /tmp/$name $to_dir/ext_$ext
+                 echo -e "t0rvalds : copying $name_orig as $name"
+                 echo -e "${txtylw}$name${txtwht}       $i        $to_dir/noExtension/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> .log
+            fi
+
           else
 
-          echo -e "t0rvalds : copying $name to folder ext_$ext"
+          if [ ! $ext = "" ]
+          then
+              echo -e "t0rvalds : copying $name to folder ext_$ext"
+          else
+              echo -e "t0rvalds : copying $name to folder noExtension"
+          fi
+
           cp -p $i $to_dir/ext_$ext
           fi
-          let "transfers_made=transfers_made+1"
           echo $i >> .files_moved
-          echo -e "${txtylw}$name${txtwht}       $i        $to_dir/ext_$ext/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> $log_name
-          echo -e "${txtylw}$name${txtwht}       $i        $to_dir/ext_$ext/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> $log_name
+          #echo -e "${txtylw}$name${txtwht}       $i        $to_dir/ext_$ext/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> $log_name
+          echo -e "${txtylw}$name${txtwht}       $i        $to_dir/ext_$ext/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> .log
       else
-          echo -e "t0rvalds : making directory ext_$ext"
+          if [ ! $ext = "" ]
+          then
+            echo -e "t0rvalds : making directory ext_$ext"
+            echo -e "t0rvalds : copying $name to folder ext_$ext"
+         else
+            echo -e "t0rvalds : making directory noExtension"
+            echo -e "t0rvalds : copying $name to folder noExtension"
+          fi
+
           mkdir $to_dir/ext_$ext
           let "folders_made=folders_made+1"
-          echo -e "t0rvalds : copying $name to folder ext_$ext"
           cp -p $i $to_dir/ext_$ext
-          let "transfers_made=transfers_made+1"
           echo $i >> .files_moved
-          echo -e "${txtylw}$name${txtwht}       $i        $to_dir/ext_$ext/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> $log_name
-          echo -e "${txtylw}$name${txtwht}       $i        $to_dir/ext_$ext/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> $log_name
+          #echo -e "${txtylw}$name${txtwht}       $i        $to_dir/ext_$ext/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> $log_name
+          echo -e "${txtylw}$name${txtwht}       $i        $to_dir/ext_$ext/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> .log
       fi
       echo $to_dir/ext_$ext >> .folder_list
   fi
@@ -245,10 +303,9 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
                 mv /tmp/$name_orig"."$ext /tmp/$name"."$ext
                 mv /tmp/$name"."$ext $to_dir/$ddmmyyyy
                 echo -e "t0rvalds : copying $name_orig.$ext as $name"
-                let "transfers_made=transfers_made+1"
                 echo $i >> .files_moved
-                echo -e "${txtylw}$name_orig.$ext${txtwht}       $i      $to_dir/$ddmmyyyy/${txtylw}$name.$ext${txtwht}     ${txtpur}`date '+%T '`${txtwht}" >> $log_name
-                echo -e "${txtylw}$name_orig.$ext${txtwht}       $i      $to_dir/$ddmmyyyy/${txtylw}$name.$ext${txtwht}     ${txtpur}`date '+%T '`${txtwht}" >> $log_name
+                #echo -e "${txtylw}$name_orig.$ext${txtwht}       $i      $to_dir/$ddmmyyyy/${txtylw}$name.$ext${txtwht}     ${txtpur}`date '+%T '`${txtwht}" >> $log_name
+                echo -e "${txtylw}$name_orig.$ext${txtwht}       $i      $to_dir/$ddmmyyyy/${txtylw}$name.$ext${txtwht}     ${txtpur}`date '+%T '`${txtwht}" >> .log
                 #echo "${txtylw}$name${txtwht}       $i        $to_dir/ext_$ext/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> $log_name
                 #echo "${txtylw}$name${txtwht}       $i        $to_dir/ext_$ext/${txtylw}$name${txtwht}     ${txtpur}`date '+%T '`${txtwht}">> $log_name
             else
@@ -264,22 +321,20 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
                 mv /tmp/$name_orig /tmp/$name
                 mv /tmp/$name $to_dir/$ddmmyyyy
                 echo -e "t0rvalds : copying $name_orig as $name"
-                let "transfers_made=transfers_made+1"
                 echo $i >> .files_moved
-                echo -e "${txtylw}$name_orig${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}   ${txtpur}`date '+%T '`${txtwht}" >> $log_name
-                echo -e "${txtylw}$name_orig${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}   ${txtpur}`date '+%T '`${txtwht}" >> $log_name
+                #echo -e "${txtylw}$name_orig${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}   ${txtpur}`date '+%T '`${txtwht}" >> $log_name
+                echo -e "${txtylw}$name_orig${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}   ${txtpur}`date '+%T '`${txtwht}" >> .log
            fi
 
            else
 
            echo -e "t0rvalds : copying $name to folder $ddmmyyyy"
            cp -p $i $to_dir/$ddmmyyyy
-           let "transfers_made=transfers_made+1"
            echo $i >> .files_moved
            #echo $name $i $to_dir/$ddmmyyyy/$name `date '+%T '`>> $log_name
            #echo $name $i $to_dir/$ddmmyyyy/$name `date '+%T '`>> $log_name
-           echo -e "${txtylw}$name${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}   ${txtpur}`date '+%T '`${txtwht}" >>        $log_name
-           echo -e "${txtylw}$name${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}   ${txtpur}`date '+%T '`${txtwht}" >>        $log_name
+           #echo -e "${txtylw}$name${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}   ${txtpur}`date '+%T '`${txtwht}" >>        $log_name
+           echo -e "${txtylw}$name${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}   ${txtpur}`date '+%T '`${txtwht}" >>        .log
            fi
        else
            echo -e "t0rvalds : making directory $ddmmyyyy"
@@ -287,10 +342,9 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
            let "folders_made=folders_made+1"
            echo -e "t0rvalds : copying $name to folder $ddmmyyyy"
            cp -p $i $to_dir/$ddmmyyyy
-           let "transfers_made=transfers_made+1"
            echo $i >> .files_moved
-           echo -e "${txtylw}$name${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}       ${txtpur}`date '+%T '`${txtwht}" >>               $log_name
-           echo -e "${txtylw}$name${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}       ${txtpur}`date '+%T '`${txtwht}" >>               $log_name
+          #echo -e "${txtylw}$name${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}       ${txtpur}`date '+%T '`${txtwht}" >>               $log_name
+           echo -e "${txtylw}$name${txtwht}      $i      $to_dir/$ddmmyyyy/${txtylw}$name${txtwht}       ${txtpur}`date '+%T '`${txtwht}" >>               .log
        fi
        echo $to_dir/$ddmmyyyy >> .folder_list
    fi
@@ -298,17 +352,23 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
    fi
    #############################################################################|
 
+uniq .log | sed 's/ext_\//noExtension\//pg' > $log_name
 
 #log generation
 echo -e "{$txtcyn}-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^"
 echo -e "|                              The Log                               |"
 echo -e  "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^{$txtwht}"
 echo -e "Total New Folders Made : $folders_made"
-echo -e "Total Moves : $transfers_made"
+echo -e "Total Moves : $((`cat $log_name | wc -l`-1))"
 for i in `cat .folder_list 2>/dev/null | sort |uniq`;
 do
     folder_name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
-    echo -e "The folder $folder_name now has `ls $i | wc -l` files."
+    if [ ! $folder_name = "ext_" ]
+    then
+        echo -e "The folder $folder_name now has `ls -A $i | wc -l` files."
+    else
+        echo -e "The folder noExtension now has `ls -A $i | wc -l` files."
+    fi
 done
 ##################################################################################|
 
@@ -323,7 +383,7 @@ then
     for i in `cat .files_moved 2>/dev/null` ;
     do
         echo -e "removing file $i..."
-        rm $i
+        rm $i > /dev/null
     done
 fi
 ##################################################################################|
@@ -333,6 +393,16 @@ echo -e "deleting temporary files..."
 if [ -f .folder_list ] ;
 then
     rm .folder_list
+fi
+
+if [ -f .log ] ;
+then
+     rm .log
+fi
+
+if [ -f .operate ] ;
+then
+      rm .operate
 fi
 
 if [ -f .files_moved ] ;
@@ -349,6 +419,20 @@ for i in `find . -type d -name "*.zip(unpack)" 2> /dev/null `;
 do
     rm -rf $i 2> /dev/null
 done
+##################################################################################|
+if [ -d $to_dir/ext_ ]
+then
+    if [ -d $to_dir/noExtension ]
+    then
+        for i in `find $to_dir/ext_ -type f`
+        do
+            mv $i $to_dir/noExtension
+        done
+        rm -rf $to_dir/ext_
+    else
+    mv $to_dir/ext_ $to_dir/noExtension
+    fi
+fi
 
 ##################################################################################|
 
@@ -364,7 +448,7 @@ echo -e "process completed, stop music or vibin' ? [yes/no]"
 read music_flag
 if [ $music_flag = "yes" ];
 then
-kill -9 $music_pid
+kill -9 $music_pid > /dev/null
 fi
 ##################################################################################|
 #helper code
