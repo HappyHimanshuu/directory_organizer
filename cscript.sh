@@ -11,11 +11,6 @@
  txtwht='\e[0;37m' # White
 #########################3
 
-###############################|
-paplay bgm.mp3 & >/dev/null
-music_pid=`echo "$!"` >/dev/null
-###############################|
-
 #var_management
 from_dir="$1"
 to_dir="$2"
@@ -28,27 +23,71 @@ exclusions=""
 log_name="log.txt"
 sedex='/\/[^/.]\+\.\?[^/.]\+$/p'
 g_invoked=0
+music_file="bgm.mp3"
 #########################|
+
+###############################|
+ paplay $music_file & >/dev/null
+ music_pid=`echo "$!"` >/dev/null
+###############################|
 
 #encorporating the options
 ############################|
-while getopts ':ds:e:l:g:' OPTION ;
+while getopts ':ds:e:l:g:m:' OPTION ;
  do
      case "$OPTION" in
          d) del_flag=1 ;;
          s) s_chosen=$OPTARG;
-            if [ ! s_chosen = "ext" ] && [ ! s_chosen = "date" ] ;
+            if [ [ ! s_chosen = "ext" ] && [ ! s_chosen = "date" ] ] ;
             then
                 echo "Wrong argument passed for -s, printing usage..."
                 cat usage;
                 kill -9 $music_pid > /dev/null;
                 exit 1;
             fi ;;
-         e) exclusions=$OPTARG ;;
-         l) log_name=$OPTARG ;;
+         e) exclusions=$OPTARG
+            flag=`echo $exclusions | grep -c "^-"`
+            if [ $flag -ge 1 ]
+            then
+            cat usage;
+            kill -9 $music_pid > /dev/null;
+            exit 1;
+            fi
+            ;;
+         l) log_name=$OPTARG ;
+            flag=`printf "%s" "$log_name" | grep -c '^-'`
+            if [ $flag -ge 1 ]
+            then
+            cat usage;
+            kill -9 $music_pid > /dev/null;
+            exit 1;
+            fi
+            ;;
          g) sedex=$OPTARG ;
              g_invoked=1
-             echo "Using customised sed for extension filter(unstable)";;
+             echo "Using customised sed for extension filter(unstable)";
+             flag=`printf "%s" "$sedex" | grep -c '^-'`
+             if [ $flag -ge 1 ]
+             then
+             cat usage;
+             kill -9 $music_pid > /dev/null;
+             exit 1;
+             fi
+             ;;
+         m) music_file=$OPTARG
+              kill -9 $music_pid 2> /dev/null
+              paplay $music_file & > /dev/null
+              music_pid=`echo "$!"` >/dev/null
+
+              flag=`printf "%s" "$music_file" | grep -c '^-'`
+              if [ $flag -ge 1 ]
+              then
+              cat usage;
+              kill -9 $music_pid > /dev/null;
+              exit 1;
+              fi
+              ;;
+
          :) echo -e "Wrong usage, use option -h to print usage."
              cat usage ;
              kill -9 $music_pid > /dev/null;
@@ -110,7 +149,7 @@ echo -e "-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^$
  fi
  #handle ""
 #####################################################|
-find $from_dir -type f | sed -n $sedex  > .operate
+find $from_dir -type f | sed -n "$sedex"  > .operate
 if [ $g_invoked -eq 0 ];
 then
     find $from_dir -type f | sed -n '/\/[^./]$/p' >> .operate
