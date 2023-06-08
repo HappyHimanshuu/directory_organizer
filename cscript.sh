@@ -392,6 +392,8 @@ fi
    #############################################################################|
 
 uniq .log | sed 's/ext_\//noExtension\//pg' > $log_name
+uniq $log_name > .log
+uniq .log > $log_name
 
 #log generation
 echo -e "{$txtcyn}-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^-^"
