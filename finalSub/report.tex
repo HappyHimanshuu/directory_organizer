@@ -1,0 +1,772 @@
+\documentclass[12pt]{article}
+
+\usepackage{graphicx}
+\usepackage{minted}
+\usepackage{fancyhdr}
+
+\title{\textsc{\Huge {Directory Organizer \\ in \\ SHELL}}}
+\author{\textsc{Himanshu Gangwal}}
+\date{\textsc{\today}}
+\pagestyle{fancy}
+\lhead{Directory Organizer in SHELL}
+\rhead{\textsc{Himanshu Gangwal}}
+\cfoot{Page \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\begin{document}
+\maketitle
+
+%abstract
+\begin{abstract}
+    This is the documentation for the directory organizer, our project, written entirely in bash. This document explains its features and source.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+\section{Introduction}
+    \begin{flushleft}
+    The Bash script presented offers a versatile solution for file organization tasks. It facilitates the seamless transfer of files from a source directory to a destination directory while providing options for customization. The script primarily categorizes files based on their extensions or creation dates, ensuring a systematic arrangement. Additionally, it grants users the ability to exclude specific file extensions, allowing for more selective organization.\\
+    Moreover, the script includes the option to delete files from the source directory after successful transfer, streamlining the cleanup process. To aid in tracking and monitoring file transfers, the script also incorporates a logging feature that records the details of each transfer operation, ensuring a comprehensive record of all actions performed.\\
+    The script's functionality extends beyond regular files and encompasses zip files as well. It automatically detects and unpacks zip files recursively, ensuring that the content within them is appropriately organized. This feature adds an extra layer of convenience, eliminating the need for manual extraction.
+    \end{flushleft}
+
+\section{Some Useful Info}
+    \begin{flushleft}
+        The code provided is commented wherever required and this documentation will further explain the code briefly. A copy of the code is also availible here\footnote{https://github.com/hotramen-hellfire}. The code ha salready been dissected into sections by hashes, wherever required to further simplify the explanation. For example, 
+    \begin{minted}{shell}
+    txtwht='\e[0;37m' # White
+    #########################3
+        
+    ###############################|
+    paplay $music_file & >/dev/null
+    music_pid=`echo "$!"` >/dev/null
+    ###############################|
+        
+    #var_management
+    from_dir="$1"
+    \end{minted}
+        \end{flushleft}
+    \subsection{A Cool Dependency !}\label{music}
+    \begin{flushleft}
+        As seen in the above snippet the code uses \textit{paplay}, as you might have guessed the script plays a background track every time you run it. The audio file played should be in the same directory as the script with the name \textit{bgm.mp3}. After the organization process completes the user is prompted with the option to continue or quit the audio track.
+    \end{flushleft}
+
+\section{The CODE}
+    
+    \begin{flushleft}
+        The code is explained partitioned on the basis of functionality.\\
+        Let's Start, 
+        \begin{minted}{shell}
+            #!/bin/bash
+        \end{minted}
+    \end{flushleft}
+    
+    \subsection{Color Management}
+    The script uses color variables which are mainly used by the echo statements to highlight the stdout and log whenever required, besides these it also makes the program look a bit cooler!\footnote{https://stackoverflow.com/questions/13054973/colorizing-text}
+    \\\textbf{Snippet :}
+    \begin{minted}{shell}
+     txtylw='\e[0;33m' # Yellow
+     txtblu='\e[0;34m' # Blue
+     txtpur='\e[0;35m' # Purple
+    \end{minted}
+    These are used as echo attributes as shown to set the echo output stream color, \\
+    \begin{minted}{shell}
+        echo -e "${txtgrn}FileName      SourceDir       
+        DestinationDir      TimeStamp${txtwht}" >> $log_name
+    \end{minted}
+    
+    \subsection{The BGM}
+    As explained in \ref{music} above, this piece of text is responsible to sopoth your years while your files are being organized,
+    \clearpage
+    \textbf{Snippet :}
+    \begin{minted}{shell}
+    paplay $music_file & >/dev/null
+    music_pid=`echo "$!"` >/dev/null
+    \end{minted}
+    The program also prompts to stop the music before exiting, this is accomplished by storing the $PID$ of the $paplay$ process in the variable $music_pid$ and then kill the process with this $PID$ if required at the end.
+
+    \subsection{Variable Management}
+    
+    The \texttt{\#var\_management} portion is used to keep track of the variables used in an organized way.
+    
+    \begin{minted}{shell}
+    from_dir="$1"
+    to_dir="$2"
+    shift
+    shift
+    del_flag=0
+    folders_made=0
+    s_chosen="ext"
+    exclusions=""
+    log_name="log.txt"
+    sedex='/\/[^/.]\+\.\?[^/.]\+$/p'
+    g_invoked=0
+    music_file="bgm.mp3"
+    \end{minted}    
+    
+    The following variables are used in the script:
+    
+    \begin{itemize}
+        \item \texttt{from\_dir}: Source directory path.
+        \item \texttt{to\_dir}: Destination directory path.
+        \item \texttt{del\_flag}: Flag to indicate whether files should be deleted after transfer (0 or 1).
+        \item \texttt{folders\_made}: Number of folders created.
+        \item \texttt{s\_chosen}: Sorting option chosen (``ext" or ``date").
+        \item \texttt{exclusions}: Extensions to be excluded from sorting.
+        \item \texttt{log\_name}: Name of the log file (currently set to the default value "log.txt").
+        \item \texttt{sedex}: Regular expression pattern used by \texttt{sed} command. (can be set by -g option)
+        \item \texttt{g\_invoked}: Flag to indicate whether the script has been invoked (0 or 1).
+        \item \texttt{music\_file}: Name of the background music file (currently set to "bgm.mp3", can be set by -m option).
+    \end{itemize}
+
+
+    \subsection{GetOpts}
+    
+    The options are handled using the \texttt{getopts} feature in shell. The \texttt{':ds:e:l:g:m:'} specifies the options that can be used with the script, each having its own functionality. Options that require arguments are followed by a colon.
+    
+    \begin{minted}{shell}
+    while getopts ':ds:e:l:g:m:' OPTION;
+    do
+        case "$OPTION" in
+            d) del_flag=1 ;;
+            s) s_chosen=$OPTARG;
+                if [[ ! "$s_chosen" = "ext" && ! "$s_chosen" = "date" ]];
+                then
+                    echo "Wrong argument passed for -s, printing usage..."
+                    cat usage;
+                    kill -9 $music_pid > /dev/null;
+                    exit 1;
+                fi ;;
+            e) exclusions=$OPTARG
+                flag=$(echo $exclusions | grep -c "^-")
+                if [ $flag -ge 1 ]
+                then
+                    cat usage;
+                    kill -9 $music_pid > /dev/null;
+                    exit 1;
+                fi ;;
+            l) log_name=$OPTARG ;
+                flag=$(printf "%s" "$log_name" | grep -c '^-' )
+                if [ $flag -ge 1 ]
+                then
+                    cat usage;
+                    kill -9 $music_pid > /dev/null;
+                    exit 1;
+                fi ;;
+            g) sedex=$OPTARG ;
+                g_invoked=1
+                echo "Using customized sed for extension filter (unstable)";
+                flag=$(printf "%s" "$sedex" | grep -c '^-' )
+                if [ $flag -ge 1 ]
+                then
+                    cat usage;
+                    kill -9 $music_pid > /dev/null;
+                    exit 1;
+                fi ;;
+            m) music_file=$OPTARG
+                kill -9 $music_pid 2> /dev/null
+                paplay $music_file & > /dev/null
+                music_pid=$(echo "$!")
+                flag=$(printf "%s" "$music_file" | grep -c '^-' )
+                if [ $flag -ge 1 ]
+                then
+                    cat usage;
+                    kill -9 $music_pid > /dev/null;
+                    exit 1;
+                fi ;;
+            :) echo -e "Wrong usage, printing manual..."
+                cat usage ;
+                kill -9 $music_pid > /dev/null;
+                exit 1 ;;
+            ?) echo -e "Wrong usage, printing manual..."
+                cat usage ;
+                kill -9 $music_pid > /dev/null;
+                exit 1 ;;
+        esac
+    done
+    \end{minted}
+    
+    The following options are available:
+    
+    \begin{itemize}
+        \item \texttt{-d}: Sets the \texttt{del\_flag} variable to 1.
+        \item \texttt{-s}: Sets the \texttt{s\_chosen} variable to the value specified after \texttt{-s}. If an invalid value is provided, an error message is displayed.
+        \item \texttt{-e}: Sets the \texttt{exclusions} variable to the value specified after \texttt{-e}. If the value starts with a dash (-), an error message is displayed.
+        \item \texttt{-l}: Sets the \texttt{log\_name} variable to the value specified after \texttt{-l}. If the value starts with a dash (-), an error message is displayed.
+        \item \texttt{-g}: Sets the \texttt{sedex} variable to the value specified after \texttt{-g}. The \texttt{g\_invoked} variable is set to 1. If the value starts with a dash (-), an error message is displayed.
+        \item \texttt{-m}: Sets the \texttt{music\_file} variable to the value specified after \texttt{-m}. It kills the previous music process, plays the new music file, and captures the process ID. If the value starts with a dash (-), an error message is displayed.
+        \item \texttt{:} If an option requires an argument but no argument is provided, the script displays a wrong usage message and the content of the \texttt{usage} file. It then kills the music process (if any) and exits with status 1.
+        \item \texttt{?} If an invalid option is provided, the script displays a wrong usage message and the content of the \texttt{usage} file. It then kills the music process (if any) and exits with status 1.
+    \end{itemize}
+
+    \subsection{Zip Preprocessing}
+    \begin{flushleft}
+        The following piece of code incorporates the functionality to recursively organize the contents of zip files.\\
+        \textbf{Snippet :}
+        \begin{minted}{shell}
+#running zip preprocessor_ to construct recursive zip tree
+ while  [ `find $from_dir -name "*.zip" -type f | wc -l` -gt 0 ] ;
+ do
+     for i in `find $from_dir -name "*.zip" -type f`;
+     do
+         name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
+         path=`echo $i | sed -n -e "s/$name$//p"`
+         unzip -o -q $i -d $path/$name'(unpack)' 2> /dev/null
+         mv $i $i"^"
+     done
+ done
+
+ for i in `find $from_dir -name "*.zip^" -type f` ;
+ do
+    mv $i  `echo $i | sed 's/\^//g'`
+ done
+        \end{minted}
+        The above code creates a recursive zip tree, of the form s.t. any zip file day \texttt{hello.zip} is processed to \texttt{hello(unpack).zip} along side the original zip file, as seen in the while loop condition, this process repeats itself in an iterative manner repeats until all zip files are processed.\\
+        \textbf{In short :}\\
+        \begin{enumerate}
+        \item The code runs in a loop as long as there are more than one \texttt{.zip} files found in the \texttt{from\_dir} directory.
+        \item Inside the loop, it iterates over each \texttt{.zip} file found in the \texttt{from\_dir} directory.
+        \item It extracts the file name (\texttt{name}) and the path (\texttt{path}) of the current \texttt{.zip} file using \texttt{awk} and \texttt{sed} commands.
+        \item The \texttt{unzip} command is used to extract the contents of the current \texttt{.zip} file into a directory named \texttt{$path/$name'(unpack)'}. The \texttt{-o} option overwrites existing files, and the \texttt{-q} option suppresses output. Any error messages are redirected to \texttt{/dev/null}.
+        \item After extracting the contents, the original \texttt{.zip} file is renamed by appending a caret (\texttt{\^}) at the end of the filename using the \texttt{mv} command.
+        \item Once all the \texttt{.zip} files have been processed, another loop is used to find the renamed \texttt{.zip\^} files.
+        \item Each renamed \texttt{.zip\^} file is then renamed back to its original name by removing the caret (\texttt{\^}) using the \texttt{sed} command.
+        \end{enumerate}
+        A piece of code at the exit will recreate the original directory structure. (refer \ref{remunpack})
+    \end{flushleft}
+
+    \subsection{Exclusions}
+    \begin{flushleft}
+    The code provides the option to exclude certain file extensions from sorting.\\
+    In usage the argument passed to \texttt{-e} are assumed to be comma separated.
+    \\\textbf{Snippet :}
+    \begin{minted}{shell}
+ #exclusions
+ if [ ! $exclusions = ""  ]
+ then
+     echo -e "t0rvalds : exclusions are on, excluding files with extensions "
+     echo $exclusions | sed 's/,/ /g' > .exclusions_list
+     for exc in `cat .exclusions_list 2>/dev/null`
+     do
+         echo -e "${txtred}$exc${txtwht}"
+     done
+ fi
+    \end{minted}
+    \begin{itemize}
+    \item A message is displayed to indicate that exclusions are enabled, informing the user that files with certain extensions will be excluded from sorting.
+    \item The exclusions provided by the user are stored in a temporary file named \texttt{.exclusions\_list}. The \texttt{echo} command is used to output the exclusions variable, and the \texttt{sed} command replaces commas (,) with spaces ( ) to separate the extensions.
+    \item A \texttt{for} loop iterates over each exclusion in the \texttt{.exclusions\_list} file.
+        \begin{itemize}
+            \item The exclusion is displayed to the user, highlighted in red color using the \texttt{txtred} variable (assuming appropriate color definitions are in place).
+        \end{itemize}
+    \item If the \texttt{.exclusions\_list} file does not exist (indicating no exclusions were provided), any error messages are redirected to \texttt{/dev/null}.
+    \end{itemize}
+    Further more a check in the main loop is used to exclude the specified extensions.
+    \end{flushleft}
+
+    \subsection{Organizing by Extension}\label{orgExt}
+\begin{flushleft}
+The code includes functionality to organize files based on their extensions. It performs the following steps:
+
+    \begin{enumerate}
+    \item If the sorting option chosen is ``ext" (by extension), the code proceeds with organizing files by their extensions.
+    \item A message is displayed to indicate that the sorting is based on extension.
+    \\\textbf{snippet :}
+    \begin{minted}{shell}
+  if [ $s_chosen = "ext" ]
+  then
+      echo -e "t0rvalds : organizing by extension"
+    \end{minted}    
+    \item The code searches for all regular files (excluding directories) in the \texttt{from\_dir} directory using the \texttt{find} command. Only files with an extension are selected using the \texttt{sed} command with a regular expression pattern.(can be changed using -g option)
+    \\\textbf{snippet :}
+    \begin{minted}{shell}
+    ...
+    find $from_dir -type f | sed -n "$sedex"  > .operate
+    if [ $g_invoked -eq 0 ];
+    then
+        find $from_dir -type f | sed -n '/\/[^./]$/p' >> .operate
+    fi
+    ...
+    `for i in `cat .operate`
+    \end{minted}
+    \item For each file (\texttt{i}), the following actions are performed:
+        \begin{itemize}
+            \item The variable \texttt{count} is set to the number of times the string "(unpack)" appears in the file name, indicating whether the file is within an archive.
+            \item The file name (\texttt{name}) and extension (\texttt{ext}) are extracted using \texttt{awk}.
+            \item The file path (\texttt{path}) is obtained by removing the file name from the full file path using \texttt{sed}.
+      \\\textbf{snippet :}
+      \begin{minted}{shell}
+      count=`echo $i | grep -c "(unpack)"`
+      name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
+      ext=`echo $name | awk 'BEGIN{FS="."} {print $NF}'`
+      path=`echo $i | sed -n -e "s/$name$//p"`
+      \end{minted}
+            \item If the file is within an archive (count is greater than or equal to 1), a message is displayed indicating the current archive path.
+            \item If the destination directory (\texttt{to\_dir}) does not exist, a message is displayed and a new directory is created using \texttt{mkdir}.
+      \\\textbf{snippet :}
+      \begin{minted}{shell}
+      if [ ! -d $to_dir ]
+      then
+          echo -e "${txtpur}t0rvalds : the destination 
+          folder doesn't exists, making one...${txtwht}"
+          mkdir -p $to_dir
+      fi
+      \end{minted}       
+            \item The code handles exclusions by iterating over each exclusion (\texttt{exc}) from the \texttt{.exclusions\_list} file.
+                \\- If the exclusion matches the file extension, a message is displayed indicating the exclusion and the \texttt{exclude\_flag} is set to 1.
+            \item If the file is not excluded (\texttt{exclude\_flag} is not 1), the code proceeds to organize the file.
+                \\- If a folder named \texttt{ext\_$ext$\footnote{This is the extension of the file being currently processed.}} already exists in the destination directory, the code checks if a file with the same name exists.
+                    \\-If file with the same name already exists the name a numeric appending scheme is employed to prevent overwriting.
+            \\\textbf{snippet :}
+    \begin{minted}{shell}
+    while [ -f $to_dir/ext_$ext/$name"."$ext ]
+    do
+    echo -e "t0rvalds : $name"."$ext exists in destination folder"
+    let "j=j+1"
+    name=$name_orig"_"$j
+    done
+    \end{minted}
+                - Further a copying scheme is employed which copies the file from the source to \texttt{/tmp}
+                then rename the file s.t. the name is unique and the finally copy it to the destination directory.
+                \\- If a file with the same name does not exist, the file is directly copied to the \texttt{ext\_$ext$} directory in the destination.
+                \\- The number of transfers made is incremented, and the file path is added to the \texttt{.files\_moved} file.
+                \\- Information about the file transfer is logged to the specified log file (\texttt{$log\_name$}).
+            \item If the \texttt{ext\_$ext$} directory does not exist in the destination, a new directory is created.
+                \\- The number of folders created is incremented.
+                \\- The file is copied to the newly created directory.
+                \\- The number of transfers made is incremented, and the file path is added to the \texttt{.files\_moved} file.
+                \\- Information about the file transfer is logged to the specified log file (\texttt{$log\_name$}).
+            \item The destination directory (\texttt{to\_dir/ext\_$ext$}) is added to the \texttt{.folder\_list} file.
+        \end{itemize}
+    \end{enumerate}
+    \end{flushleft}
+
+    \subsection{Organizing by Date}
+
+    The code includes functionality to organize files based on their creation dates. It performs the following steps:
+    
+    \begin{enumerate}
+      \item If the sorting option chosen is "date," the code proceeds with organizing files by their creation dates.
+      
+      \textbf{Snippet:}
+    \begin{minted}{shell}
+    if [ $s_chosen = "date" ]
+    then
+        echo -e "t0rvalds : organizing by date created"
+    \end{minted}
+      
+      \item The code searches for all regular files in the specified source directory using the `find` command.
+      
+      \textbf{Snippet:}
+    \begin{minted}{shell}
+    for i in `find $from_dir -type f` ;
+    \end{minted}
+      
+      \item For each file (\texttt{i}), the following actions are performed:
+        \begin{itemize}
+          \item The code checks if the file is within an archive by searching for the string "(unpack)" in the file name.
+          
+          \textbf{Snippet:}
+    \begin{minted}{shell}
+    count=`echo $i | grep -c "(unpack)"`
+    \end{minted}
+          
+          \item The file name (\texttt{name}), extension (\texttt{ext}), and path (\texttt{path}) are extracted from the file's full path.
+          
+          \textbf{Snippet:}
+    \begin{minted}{shell}
+    name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
+    ext=`echo $name | awk 'BEGIN{FS="."} {print $NF}'`
+    path=`echo $i | sed -n -e "s/$name$//p"`
+    \end{minted}
+          
+          \item If the destination directory (\texttt{to\_dir}) does not exist, a new directory is created.
+          
+          \textbf{Snippet:}
+          \begin{minted}{shell}
+    if [ ! -d $to_dir ]
+    then
+        echo -e "t0rvalds : the destination 
+        folder doesn't exist,creating"
+        mkdir -p $to_dir
+    fi
+    \end{minted}
+          
+          \item The creation date of the file (\texttt{ddmmyyyy}) is obtained using the `stat` command and formatted as DDMMYYYY.
+          
+          \textbf{Snippet:}
+    \begin{minted}{shell}
+    ddmmyyyy=`stat $i | sed -n '/Birth/p' | 
+    awk 'BEGIN{FS=" "}{print $2}' | 
+    awk 'BEGIN{FS="-"} {print $3$2$1}'`
+    \end{minted}
+          
+          \item If the file's extension is not in the exclusion list, the code proceeds to organize the file.
+          
+          \textbf{Snippet:}
+          \begin{minted}{shell}
+    for exc in `cat .exclusions_list 2> /dev/null`
+    do
+        if [ $exc == $ext ]
+            then
+            echo -e "t0rvalds : exclusion raised for 
+            $name as .files are excluded..."
+        exclude_flag=1
+        fi 2>/dev/null
+    done
+          
+    if [ ! $exclude_flag = 1 ]
+    then
+        # Organize the file based on the date
+    fi
+    \end{minted}
+          
+          \item If the destination directory for the specific date does not exist, a new directory is created.
+          
+          \textbf{Snippet:}
+    \begin{minted}{shell}
+    if [ ! -d $to_dir/$ddmmyyyy ]
+    then
+        echo -e "t0rvalds : creating directory for $ddmmyyyy"
+        mkdir -p $to_dir/$ddmmyyyy
+    fi
+    \end{minted}
+          
+          \item The file is moved to the corresponding destination directory.
+          
+          \textbf{Snippet:}
+    \begin{minted}{shell}
+    echo -e "t0rvalds : moving $name to $to_dir/$ddmmyyyy/"
+    mv $i $to_dir/$ddmmyyyy/
+    \end{minted}
+        \end{itemize}
+    \end{enumerate}
+    The copying scheme is same as the one followed when organizing by extension as documented in section \ref{orgExt} .
+
+    \subsection{Folder Statistics}
+    
+    The following code snippet provides information about the total number of new folders created, the total number of moves performed, and the file count for each folder in a specified folder list.
+    
+    \begin{minted}[breaklines]{shell}
+    echo -e "Total New Folders Made : $folders_made"
+    echo -e "Total Moves : $((`cat $log_name | wc -l`-1))"
+    for i in `cat .folder_list 2>/dev/null | sort |uniq`; do
+        folder_name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
+        if [ ! $folder_name = "ext_" ]; then
+            echo -e "The folder $folder_name now has `ls -A $i | wc -l` files."
+        else
+            echo -e "The folder noExtension now has `ls -A $i | wc -l` files."
+        fi
+    done
+    \end{minted}
+    
+    The code includes the following steps:
+    
+    \begin{enumerate}
+      \item The code displays the total number of new folders created using the variable \texttt{\$folders\_made}.
+      
+      \begin{minted}[breaklines]{shell}
+      echo -e "Total New Folders Made : $folders_made"
+      \end{minted}
+      
+      \item The code displays the total number of moves performed by subtracting 1 from the line count of the log file (\texttt{\$log\_name}).
+      
+      \begin{minted}[breaklines]{shell}
+      echo -e "Total Moves : $((`cat $log_name | wc -l`-1))"
+      \end{minted}
+      
+      \item The code iterates through each folder in the specified folder list (stored in the file \texttt{.folder\_list}).
+      
+      \begin{minted}[breaklines]{shell}
+      for i in `cat .folder_list 2>/dev/null | sort |uniq`; do
+          # Code block
+      done
+      \end{minted}
+      
+      \item For each folder (\texttt{i}), the following actions are performed:
+        \begin{itemize}
+          \item The folder name (\texttt{folder\_name}) is extracted from the full path using the \texttt{awk} command.
+          
+          \begin{minted}[breaklines]{shell}
+    folder_name=`echo $i | awk 'BEGIN{FS="/"} {print $NF}'`
+          \end{minted}
+          
+          \item The code displays the folder name along with the count of files in the folder. It uses the \texttt{ls} command with the \texttt{-A} option (to include hidden files) piped into \texttt{wc -l} to count the files.
+          
+          \begin{minted}[breaklines]{shell}
+    if [ ! $folder_name = "ext_" ]; then
+        echo -e "The folder $folder_name now has `ls -A $i | wc -l` files."
+    else
+        echo -e "The folder noExtension now has `ls -A $i | wc -l` files."
+    fi
+          \end{minted}
+        \end{itemize}
+    \end{enumerate}
+    
+    This explains the purpose and functionality of the provided code, including the display of total new folders created, total moves performed, and the file count for each folder in the specified folder list.
+
+
+
+    \subsection{Exit Handling}
+    
+    The following code snippet handles the exit process. It checks the value of the variable \texttt{del\_flag} and performs specific actions accordingly.
+    
+    \begin{minted}{shell}
+    echo -e "\nhandling exit : "
+    if [ $del_flag = 1 ]
+    then
+        echo '-d : deleting organized files'
+    fi
+    
+    # -d option handler
+    if [ $del_flag = 1 ]
+    then
+        for i in `cat .files_moved 2>/dev/null` ;
+        do
+            echo -e "removing file $i..."
+            rm $i
+        done
+    fi
+    \end{minted}
+    
+    The code includes the following steps:
+    
+    \begin{enumerate}
+      \item The code displays a message indicating that it is handling the exit process.
+      
+      \textbf{Snippet:}
+      \begin{minted}{shell}
+      echo -e "\nhandling exit : "
+      \end{minted}
+      
+      \item The code checks if the value of the variable \texttt{del\_flag} is equal to 1. If true, it displays a message indicating that it is deleting organized files.
+      
+      \textbf{Snippet:}
+      \begin{minted}{shell}
+      if [ $del_flag = 1 ]
+      then
+          echo '-d : deleting organized files'
+      fi
+      \end{minted}
+      
+      \item If the \texttt{del\_flag} is equal to 1, the code enters a loop that iterates through each file listed in the file \texttt{.files\_moved}. For each file (\texttt{i}), it performs the following actions:
+        \begin{itemize}
+          \item The code displays a message indicating that it is removing the file.
+          
+          \textbf{Snippet:}
+          \begin{minted}{shell}
+          echo -e "removing file $i..."
+          \end{minted}
+          
+          \item The file is removed using the \texttt{rm} command.
+          
+          \textbf{Snippet:}
+          \begin{minted}{shell}
+          rm $i
+          \end{minted}
+        \end{itemize}
+        
+      \textbf{Snippet:}
+      \begin{minted}{shell}
+      if [ $del_flag = 1 ]
+      then
+          for i in `cat .files_moved 2>/dev/null` ;
+          do
+              # Code block
+          done
+      fi
+      \end{minted}
+    \end{enumerate}
+    
+    This explains the purpose and functionality of the provided code for handling the exit process. It includes the display of messages, deletion of organized files if the \texttt{del\_flag} is set to 1, and the removal of each file listed in the file \texttt{.files\_moved}.
+
+
+    \subsection{Deleting Temporaries}
+
+    The following code snippet is responsible for deleting temporary files and directories.
+    
+    \begin{minted}{shell}
+    # deletingTemporaries
+    echo -e "deleting temporary files..."
+    
+    # Delete .folder_list file if it exists
+    if [ -f .folder_list ] ;
+    then
+        rm .folder_list
+    fi
+    
+    # Delete .files_moved file if it exists
+    if [ -f .files_moved ] ;
+    then
+        rm .files_moved
+    fi
+    
+    # Delete .exclusions_list file if it exists
+    if [ -f .exclusions_list ];
+    then
+        rm .exclusions_list
+    fi
+    
+    # Delete directories with name "*.zip(unpack)" if they exist
+    for i in `find . -type d -name "*.zip(unpack)" 2> /dev/null `;
+    do
+        rm -rf $i 2> /dev/null
+    done
+    \end{minted}
+    
+    The code includes the following steps:
+    
+    \begin{enumerate}
+      \item The code displays a message indicating that it is deleting temporary files.
+      
+      \textbf{Snippet:}
+      \begin{minted}{shell}
+      echo -e "deleting temporary files..."
+      \end{minted}
+      
+      \item The code checks if the file \texttt{.folder\_list} exists. If true, it removes the file using the \texttt{rm} command.
+      
+      \textbf{Snippet:}
+      \begin{minted}{shell}
+      if [ -f .folder_list ] ;
+      then
+          rm .folder_list
+      fi
+      \end{minted}
+      
+      \item The code checks if the file \texttt{.files\_moved} exists. If true, it removes the file using the \texttt{rm} command.
+      
+      \textbf{Snippet:}
+      \begin{minted}{shell}
+      if [ -f .files_moved ] ;
+      then
+          rm .files_moved
+      fi
+      \end{minted}
+      
+      \item The code checks if the file \texttt{.exclusions\_list} exists. If true, it removes the file using the \texttt{rm} command.
+      
+      \textbf{Snippet:}
+      \begin{minted}{shell}
+      if [ -f .exclusions_list ];
+      then
+          rm .exclusions_list
+      fi
+      \end{minted}
+      
+       \subsubsection{Zip Postprocessing}\label{remunpack}
+       The code searches for directories with the name ``*.zip(unpack)" and deletes them. It uses the \texttt{find} command with the \texttt{-type d} option to locate directories and the \texttt{-name} option to match the name pattern. The directories are removed using the \texttt{rm -rf} command.
+      
+      \textbf{Snippet:}
+      \begin{minted}{shell}
+      for i in `find $to_dir -type d -name "*.zip(unpack)" 2> /dev/null `;
+      do
+          rm -rf $i 2> /dev/null
+      done
+      \end{minted}
+    \end{enumerate}
+    
+    This explains the purpose and functionality of the provided code for deleting temporary files and directories. It includes the deletion of specific files (\texttt{.folder\_list}, \texttt{.files\_moved}, \texttt{.exclusions\_list}) and the removal of directories with the name pattern "*.zip(unpack)".
+
+    \subsection{Stopping Music}
+
+    The following code snippet allows the user to stop the music or continue vibin'.
+    
+    \begin{minted}{shell}
+    # stop music?
+    echo -e "process completed, stop music or vibin' ? [yes/no]"
+    read music_flag
+    
+    # Check if the user wants to stop the music
+    if [ $music_flag = "yes" ];
+    then
+        kill -9 $music_pid
+    fi
+    \end{minted}
+    
+    The code includes the following steps:
+    
+    \begin{enumerate}
+      \item The code displays a message asking the user whether they want to stop the music or continue vibin'.
+      
+      \textbf{Snippet:}
+      \begin{minted}{shell}
+      echo -e "process completed, stop music or vibin' ? [yes/no]"
+      read music_flag
+      \end{minted}
+      
+      \item The code reads the user's response and stores it in the variable \texttt{music\_flag}.
+      
+      \textbf{Snippet:}
+      \begin{minted}{shell}
+      read music_flag
+      \end{minted}
+      
+      \item The code checks if the value of \texttt{music\_flag} is equal to "yes". If true, it kills the music process using the \texttt{kill} command with the \texttt{-9} option and the process ID (\texttt{\$music\_pid}).
+      
+      \textbf{Snippet:}
+      \begin{minted}{shell}
+      if [ $music_flag = "yes" ];
+      then
+          kill -9 $music_pid
+      fi
+      \end{minted}
+    \end{enumerate}
+    
+    This explains the purpose and functionality of the provided code for stopping the music. It prompts the user to decide whether they want to stop the music or continue vibin', and if the user chooses to stop the music, it kills the associated process using the process ID stored in the variable \texttt{music\_pid}.
+    
+    \section{Usage Brief}
+    The Directory Organizer is a tool designed to help you organize your files in a directory. It provides several options for efficient file management. Below are the available options:
+    
+    \begin{itemize}
+      \item \texttt{-d}: This option deletes the files that have been organized from the source directory. No parameter is required.
+      \item \texttt{-e <ext1,ext2>}: Use this option to exclude specific file extensions from the organization process. Multiple extensions can be provided as a comma-separated list.
+      \item \texttt{-l <log\_name>}: Specify the name of the log file to be generated during the organization process. The log file will contain information about the files moved. Provide the desired log file name as a parameter.
+      \item \texttt{-s <date/ext>}: Choose one of the two organization schemes: "date" or "ext." The "date" scheme organizes files based on their creation date, while the "ext" scheme organizes files by their extensions.
+      \item \texttt{-m <param>}: Play a background music file during the organization process. By default, the file "bgm.mp3" is played. You can specify a different music file by providing its name as a parameter.
+      \item \texttt{-g <param>}: This option takes a \texttt{sed} statement that can be used to filter files based on custom criteria. Exercise caution when using this option, as it may produce unpredictable results. By default, the \texttt{sed} statements are set to 
+      \begin{verbatim}
+          '/\/[^/.]\+\.\?[^/.]\+ $/p'
+      \end{verbatim} and 
+      \begin{verbatim}
+          '/\/[^./]$/p'
+      \end{verbatim}
+      You can modify these statements to match your specific filtering needs.
+    \end{itemize}
+    
+    Here are a few examples of using the \texttt{-g} option:
+    \begin{itemize}
+      \item To include only \texttt{.sh} files in your source directory:
+      \begin{verbatim}
+          '/\.sh$/p'
+      \end{verbatim}
+      \item To include both \texttt{.sh} and \texttt{.tar} files: 
+      \begin{verbatim}
+        '/\.sh$\|\.tar$/p'    
+      \end{verbatim}
+      \item To include files with regular naming such as \texttt{abc.txt} etc, use the sed : 
+      \begin{verbatim}
+        '/\/[^/.]\+\.[^/.]\+$\|\/[^./]$/p'  
+      \end{verbatim}
+      \item To only get files with noextensions, use the sed :  
+      \begin{verbatim}
+        '/\/[^./]\+$/p'    
+      \end{verbatim}
+    \end{itemize}
+    
+    Please note that the provided \texttt{sed} statements are just examples, and you can customize them as per your requirements.
+    
+    To get started, use the following syntax:
+    \begin{minted}{shell}
+    directory_organizer <source> <destination> [OPTIONS]
+    \end{minted}
+    Example usage:
+    \begin{minted}{shell}
+    directory_organizer <source> <destination> -s date -l mylog.txt
+    \end{minted}
+
+
+
+\end{document}
+

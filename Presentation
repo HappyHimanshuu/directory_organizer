@@ -1,0 +1,37 @@
+check basic functionality :
+    basic functioning : bash script.sh ../testCases/clai-master ../out/basic
+    total_moves = 346
+
+check renaming : same as above
+
+exception handling : destination folder made in above example, wrong options exception handled etc.
+
+summary : shown at the end of program
+
+date : bash ~/Downloads ../out/date_delete -d -s date
+
+log_file : bash script.sh ../testCases/clai-master ../out/log_test -l mylog
+
+exclude : bash script.sh ../testCases/clai-master ../out/exclude -e py
+        total_moves = 175
+
+include : bash script.sh ../testCases/clai-master ../out/exclude -g '/\.py$/p'
+        total_moves = 171
+        (171 + 175 = 346)
+
+other -g features :
+Here are a few examples of using the -g option:
+- To include only .sh files in your source directory: '/\.sh$/p'
+- To include both .sh and .tar files: '/\.sh$\|\.tar$/p'
+- To include files with regular naming such as abc.txt etc, use the sed
+  '/\/[^/.]\+\.[^/.]\+$\|\/[^./]$/p'
+- To only get files with noextensions, use the sed
+  '/\/[^./]\+$/p'
+
+zip : bash script.sh ../testCases/clai-masterZip ../out/zip
+        total_moves = 346 + 1(zip) = 347
+
+exception_handling : bash script.sh ../testCases/clai-master ../out/exclude -e
+                     bash script.sh ../testCases/clai-master ../out/exclude -e py
+                     bash script.sh ../doesntExist ../out/error -e py -l mylog
+
